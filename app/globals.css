@@ -183,6 +183,63 @@ a {
   margin-bottom: 22px;
 }
 
+.upload-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 22px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid var(--nao-border);
+}
+
+.upload-copy strong {
+  display: block;
+  color: var(--nao-navy);
+  font-size: 1.06rem;
+}
+
+.upload-message {
+  margin: 8px 0 0;
+  color: rgba(30, 53, 101, 0.82);
+}
+
+.upload-message--error {
+  color: #a2453b;
+}
+
+.upload-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.upload-button,
+.reset-upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 52px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid var(--nao-border);
+  background: var(--nao-white);
+  color: var(--nao-navy);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.upload-button {
+  background: var(--nao-navy);
+  border-color: var(--nao-navy);
+  color: var(--nao-white);
+}
+
+.upload-button input {
+  display: none;
+}
+
 .filter-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -463,6 +520,7 @@ a {
 }
 
 @media (max-width: 920px) {
+  .upload-toolbar,
   .bar-row,
   .bar-row--stacked {
     grid-template-columns: 1fr;

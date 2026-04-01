@@ -1,12 +1,17 @@
 "use client";
 
-import { startTransition, useDeferredValue, useMemo, useState } from "react";
+import { ChangeEvent, startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { EmployeeTable } from "@/components/employee-table";
-import { getCompletionBand } from "@/lib/dashboard-data";
+import { buildDashboardSnapshot, getCompletionBand } from "@/lib/dashboard-data";
 import type { DashboardSnapshot, EmployeeCompletionRow, ManagerSummary } from "@/lib/types";
 
 type DashboardViewProps = {
   snapshot: DashboardSnapshot;
+};
+
+type UploadedSnapshot = {
+  asOf: string;
+  employees: EmployeeCompletionRow[];
 };
 
 type ManagerMix = ManagerSummary & {
@@ -23,18 +28,155 @@ function getTitle(employee: EmployeeCompletionRow) {
   return employee.job_title ?? "Unknown";
 }
 
+function normalize(value: string | null | undefined) {
+  return (value ?? "").trim().toLowerCase();
+}
+
+function parseCsv(text: string) {
+  const rows: string[][] = [];
+  let field = "";
+  let row: string[] = [];
+  let inQuotes = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    const next = text[index + 1];
+
+    if (character === '"') {
+      if (inQuotes && next === '"') {
+        field += '"';
+        index += 1;
+      } else {
+        inQuotes = !inQuotes;
+      }
+      continue;
+    }
+
+    if (character === "," && !inQuotes) {
+      row.push(field);
+      field = "";
+      continue;
+    }
+
+    if ((character === "\n" || character === "\r") && !inQuotes) {
+      if (character === "\r" && next === "\n") {
+        index += 1;
+      }
+
+      row.push(field);
+      field = "";
+
+      if (row.some((cell) => cell.length > 0)) {
+        rows.push(row);
+      }
+
+      row = [];
+      continue;
+    }
+
+    field += character;
+  }
+
+  row.push(field);
+  if (row.some((cell) => cell.length > 0)) {
+    rows.push(row);
+  }
+
+  return rows;
+}
+
 function buildManagerMix(managers: ManagerSummary[]): ManagerMix[] {
   return managers
     .map((manager) => ({
       ...manager,
-      completeCount: manager.team.filter((member) => getCompletionBand(member.completion_score) === "Complete").length,
-      nearlyCompleteCount: manager.team.filter((member) => getCompletionBand(member.completion_score) === "Nearly Complete").length,
-      needsAttentionCount: manager.team.filter((member) => getCompletionBand(member.completion_score) === "Needs Attention").length
+      completeCount: manager.team.filter(
+        (member) => getCompletionBand(member.completion_score) === "Complete"
+      ).length,
+      nearlyCompleteCount: manager.team.filter(
+        (member) => getCompletionBand(member.completion_score) === "Nearly Complete"
+      ).length,
+      needsAttentionCount: manager.team.filter(
+        (member) => getCompletionBand(member.completion_score) === "Needs Attention"
+      ).length
     }))
     .sort((a, b) => b.averageCompletion - a.averageCompletion);
 }
 
+function mergeCompletionReport(baseEmployees: EmployeeCompletionRow[], csvText: string, filename: string) {
+  const rows = parseCsv(csvText);
+  const [headers, ...dataRows] = rows;
+
+  if (!headers?.length) {
+    throw new Error("The uploaded file is empty.");
+  }
+
+  const headerIndex = new Map(headers.map((header, index) => [header.trim(), index]));
+  for (const requiredHeader of ["Name", "Email", "Completion score"]) {
+    if (!headerIndex.has(requiredHeader)) {
+      throw new Error(`The file must include the "${requiredHeader}" column.`);
+    }
+  }
+
+  const byEmail = new Map(baseEmployees.map((employee) => [normalize(employee.employee_email), employee]));
+  const byName = new Map(baseEmployees.map((employee) => [normalize(employee.employee_name), employee]));
+  const merged = baseEmployees.map((employee) => ({ ...employee, groups: [...employee.groups] }));
+
+  for (const dataRow of dataRows) {
+    const email = normalize(dataRow[headerIndex.get("Email") ?? -1]);
+    const name = dataRow[headerIndex.get("Name") ?? -1]?.trim() ?? "";
+    const completionRaw = dataRow[headerIndex.get("Completion score") ?? -1]?.trim() ?? "";
+    const match =
+      (email && byEmail.get(email)) ||
+      (name && byName.get(normalize(name))) ||
+      null;
+
+    if (!match) {
+      continue;
+    }
+
+    const mergedIndex = merged.findIndex((employee) => employee.employee_email === match.employee_email);
+    if (mergedIndex === -1) {
+      continue;
+    }
+
+    const numericCompletion = Number.parseFloat(completionRaw.replace("%", ""));
+    const groupsRaw = dataRow[headerIndex.get("Groups") ?? -1] ?? "";
+    const reportManager = dataRow[headerIndex.get("Reports to") ?? -1]?.trim() ?? "";
+    const lastActive = dataRow[headerIndex.get("Last active") ?? -1]?.trim() ?? "";
+    const jobTitle = dataRow[headerIndex.get("Job title") ?? -1]?.trim() ?? "";
+
+    merged[mergedIndex] = {
+      ...merged[mergedIndex],
+      employee_name: name || merged[mergedIndex].employee_name,
+      employee_email: email || merged[mergedIndex].employee_email,
+      job_title: jobTitle || merged[mergedIndex].job_title,
+      completion_score: Number.isNaN(numericCompletion)
+        ? merged[mergedIndex].completion_score
+        : numericCompletion,
+      trainual_manager_name: reportManager || merged[mergedIndex].trainual_manager_name,
+      manager_name:
+        merged[mergedIndex].roster_manager_name ||
+        reportManager ||
+        merged[mergedIndex].manager_name,
+      last_active: lastActive || merged[mergedIndex].last_active,
+      groups: groupsRaw
+        ? groupsRaw.split(",").map((item) => item.trim()).filter(Boolean)
+        : merged[mergedIndex].groups
+    };
+  }
+
+  return {
+    asOf: `${filename} uploaded ${new Date().toLocaleDateString()}`,
+    employees: merged
+  };
+}
+
 export function DashboardView({ snapshot }: DashboardViewProps) {
+  const [activeSnapshot, setActiveSnapshot] = useState(snapshot);
+  const [uploadMessage, setUploadMessage] = useState(
+    "Upload a fresh Trainual completion CSV to refresh this dashboard."
+  );
+  const [isUploadError, setIsUploadError] = useState(false);
   const [query, setQuery] = useState("");
   const [managerFilter, setManagerFilter] = useState("All Managers");
   const [titleFilter, setTitleFilter] = useState("All Titles");
@@ -42,17 +184,68 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
   const [bandFilter, setBandFilter] = useState("All Bands");
   const deferredQuery = useDeferredValue(query);
 
+  useEffect(() => {
+    const saved = window.localStorage.getItem("nao-trainual-uploaded-snapshot");
+
+    if (!saved) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(saved) as UploadedSnapshot;
+      if (Array.isArray(parsed.employees) && typeof parsed.asOf === "string") {
+        setActiveSnapshot(buildDashboardSnapshot(parsed.employees, parsed.asOf));
+        setUploadMessage(`Using uploaded report: ${parsed.asOf}`);
+      }
+    } catch {
+      window.localStorage.removeItem("nao-trainual-uploaded-snapshot");
+    }
+  }, []);
+
+  async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const uploaded = mergeCompletionReport(snapshot.employees, text, file.name);
+      window.localStorage.setItem("nao-trainual-uploaded-snapshot", JSON.stringify(uploaded));
+      setActiveSnapshot(buildDashboardSnapshot(uploaded.employees, uploaded.asOf));
+      setUploadMessage(`Updated from ${file.name}. This browser will keep using it until you reset.`);
+      setIsUploadError(false);
+    } catch (error) {
+      setUploadMessage(
+        error instanceof Error ? error.message : "Could not read that CSV file."
+      );
+      setIsUploadError(true);
+    }
+
+    event.target.value = "";
+  }
+
+  function handleResetUpload() {
+    window.localStorage.removeItem("nao-trainual-uploaded-snapshot");
+    setActiveSnapshot(snapshot);
+    setUploadMessage("Reset to the embedded dashboard snapshot.");
+    setIsUploadError(false);
+  }
+
   const managerOptions = useMemo(
-    () => sortAlpha(snapshot.managers.map((manager) => manager.name)),
-    [snapshot.managers]
+    () => sortAlpha(activeSnapshot.managers.map((manager) => manager.name)),
+    [activeSnapshot.managers]
   );
 
   const titleOptions = useMemo(
     () =>
       sortAlpha(
-        Array.from(new Set(snapshot.employees.map((employee) => getTitle(employee)).filter(Boolean)))
+        Array.from(
+          new Set(activeSnapshot.employees.map((employee) => getTitle(employee)).filter(Boolean))
+        )
       ),
-    [snapshot.employees]
+    [activeSnapshot.employees]
   );
 
   const statusOptions = useMemo(
@@ -60,18 +253,18 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
       sortAlpha(
         Array.from(
           new Set(
-            snapshot.employees
+            activeSnapshot.employees
               .map((employee) => employee.employee_status ?? "Unknown")
               .filter(Boolean)
           )
         )
       ),
-    [snapshot.employees]
+    [activeSnapshot.employees]
   );
 
   const filteredEmployees = useMemo(
     () =>
-      snapshot.employees.filter((employee) => {
+      activeSnapshot.employees.filter((employee) => {
         const normalizedQuery = deferredQuery.trim().toLowerCase();
         const band = getCompletionBand(employee.completion_score);
         const matchesQuery =
@@ -90,7 +283,7 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
 
         return matchesQuery && matchesManager && matchesTitle && matchesStatus && matchesBand;
       }),
-    [bandFilter, deferredQuery, managerFilter, snapshot.employees, statusFilter, titleFilter]
+    [activeSnapshot.employees, bandFilter, deferredQuery, managerFilter, statusFilter, titleFilter]
   );
 
   const filteredManagers = useMemo(() => {
@@ -121,8 +314,12 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
           email: team.find((member) => member.manager_email)?.manager_email ?? null,
           directReports,
           averageCompletion,
-          atRiskCount: team.filter((member) => getCompletionBand(member.completion_score) === "Needs Attention").length,
-          completedCount: team.filter((member) => getCompletionBand(member.completion_score) === "Complete").length,
+          atRiskCount: team.filter(
+            (member) => getCompletionBand(member.completion_score) === "Needs Attention"
+          ).length,
+          completedCount: team.filter(
+            (member) => getCompletionBand(member.completion_score) === "Complete"
+          ).length,
           team: [...team].sort((a, b) => a.completion_score - b.completion_score)
         };
       })
@@ -172,7 +369,7 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
             healthiest team completion rates, and which employees need follow-up right now.
           </p>
           <div className="hero-meta">
-            <span>Snapshot date: {snapshot.asOf}</span>
+            <span>Snapshot date: {activeSnapshot.asOf}</span>
             <span>Source: Trainual + employee roster mapping</span>
           </div>
         </article>
@@ -221,6 +418,25 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
       </section>
 
       <section className="filter-panel">
+        <div className="upload-toolbar">
+          <div className="upload-copy">
+            <strong>Refresh from Trainual CSV</strong>
+            <p className={isUploadError ? "upload-message upload-message--error" : "upload-message"}>
+              {uploadMessage}
+            </p>
+          </div>
+
+          <div className="upload-actions">
+            <label className="upload-button">
+              <input type="file" accept=".csv,text/csv" onChange={handleUpload} />
+              <span>Upload Completion Report</span>
+            </label>
+            <button type="button" className="reset-upload-button" onClick={handleResetUpload}>
+              Reset to Embedded Snapshot
+            </button>
+          </div>
+        </div>
+
         <div className="filter-grid">
           <label className="field">
             <span>Manager</span>
@@ -303,18 +519,18 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
 
           <div className="chart-scroll">
             <div className="bar-list">
-            {managerMix.map((manager) => (
-              <div key={manager.name} className="bar-row">
-                <strong className="bar-row__label">{manager.name}</strong>
-                <div className="progress-track">
-                  <span
-                    className="progress-fill"
-                    style={{ width: `${Math.max(manager.averageCompletion, 3)}%` }}
-                  />
+              {managerMix.map((manager) => (
+                <div key={manager.name} className="bar-row">
+                  <strong className="bar-row__label">{manager.name}</strong>
+                  <div className="progress-track">
+                    <span
+                      className="progress-fill"
+                      style={{ width: `${Math.max(manager.averageCompletion, 3)}%` }}
+                    />
+                  </div>
+                  <strong className="bar-row__value">{manager.averageCompletion}%</strong>
                 </div>
-                <strong className="bar-row__value">{manager.averageCompletion}%</strong>
-              </div>
-            ))}
+              ))}
             </div>
           </div>
         </article>
@@ -330,35 +546,44 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
 
           <div className="chart-scroll">
             <div className="bar-list">
-            {managerMix.map((manager) => {
-              const total = Math.max(manager.directReports, 1);
-              return (
-                <div key={manager.name} className="bar-row bar-row--stacked">
-                  <strong className="bar-row__label">{manager.name}</strong>
-                  <div className="stacked-track">
-                    <span
-                      className="stacked-segment stacked-segment--complete"
-                      style={{ width: `${(manager.completeCount / total) * 100}%` }}
-                    />
-                    <span
-                      className="stacked-segment stacked-segment--watch"
-                      style={{ width: `${(manager.nearlyCompleteCount / total) * 100}%` }}
-                    />
-                    <span
-                      className="stacked-segment stacked-segment--risk"
-                      style={{ width: `${(manager.needsAttentionCount / total) * 100}%` }}
-                    />
+              {managerMix.map((manager) => {
+                const total = Math.max(manager.directReports, 1);
+                return (
+                  <div key={manager.name} className="bar-row bar-row--stacked">
+                    <strong className="bar-row__label">{manager.name}</strong>
+                    <div className="stacked-track">
+                      <span
+                        className="stacked-segment stacked-segment--complete"
+                        style={{ width: `${(manager.completeCount / total) * 100}%` }}
+                      />
+                      <span
+                        className="stacked-segment stacked-segment--watch"
+                        style={{ width: `${(manager.nearlyCompleteCount / total) * 100}%` }}
+                      />
+                      <span
+                        className="stacked-segment stacked-segment--risk"
+                        style={{ width: `${(manager.needsAttentionCount / total) * 100}%` }}
+                      />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
             </div>
           </div>
 
           <div className="legend-row">
-            <span><i className="legend-dot legend-dot--complete" />Complete</span>
-            <span><i className="legend-dot legend-dot--watch" />Nearly Complete</span>
-            <span><i className="legend-dot legend-dot--risk" />Needs Attention</span>
+            <span>
+              <i className="legend-dot legend-dot--complete" />
+              Complete
+            </span>
+            <span>
+              <i className="legend-dot legend-dot--watch" />
+              Nearly Complete
+            </span>
+            <span>
+              <i className="legend-dot legend-dot--risk" />
+              Needs Attention
+            </span>
           </div>
         </article>
       </section>
