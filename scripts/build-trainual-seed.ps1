@@ -88,7 +88,7 @@ foreach ($row in $trainualRows) {
   $groups = @()
 
   if (-not [string]::IsNullOrWhiteSpace($row.Groups)) {
-    $groups = ($row.Groups -split ",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }
+    $groups = @(($row.Groups -split ",") | ForEach-Object { $_.Trim() } | Where-Object { $_ })
   }
 
   $roster = $null

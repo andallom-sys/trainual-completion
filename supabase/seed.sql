@@ -1,4 +1,4 @@
-﻿-- Generated from Trainual and roster exports on 2026-04-01T14:37:58
+﻿-- Generated from Trainual and roster exports on 2026-04-01T14:49:11
 truncate table public.employee_completion_snapshots;
 
 insert into public.employee_completion_snapshots (snapshot_date, employee_id, employee_name, employee_email, job_title, completion_score, trainual_manager_name, roster_manager_name, manager_name, manager_email, employee_status, last_active, groups) values ('2026-04-01'::date, 'TXC000874', 'Amaya Duke', 'dukea@naomedical.com', 'Medical Assistant', 0, 'Clifton Jourdain', 'Clifton Jourdain', 'Clifton Jourdain', null, 'Active', '03-29-2026 09:59am', array['Annual Compliance Training (US)', 'Occ Health Training', 'Everyone', 'New Hire Self-Onboarding (US)', 'Patient Care Assistants', 'Medical Assistant', 'Clifton Jourdain''s Team Members']::text[]);

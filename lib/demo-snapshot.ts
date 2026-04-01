@@ -61,7 +61,9 @@ export const demoEmployees: EmployeeCompletionRow[] = [
         "manager_email":  null,
         "employee_status":  "Active Offshore",
         "last_active":  "12-18-2024 03:06pm",
-        "groups":  "Everyone"
+        "groups":  [
+                       "Everyone"
+                   ]
     },
     {
         "snapshot_date":  "2026-04-01",
@@ -478,7 +480,9 @@ export const demoEmployees: EmployeeCompletionRow[] = [
         "manager_email":  null,
         "employee_status":  "Active Offshore",
         "last_active":  "12-11-2024 04:17pm",
-        "groups":  "Everyone"
+        "groups":  [
+                       "Everyone"
+                   ]
     },
     {
         "snapshot_date":  "2026-04-01",
@@ -987,7 +991,9 @@ export const demoEmployees: EmployeeCompletionRow[] = [
         "manager_email":  null,
         "employee_status":  "Active Offshore",
         "last_active":  "10-22-2025 04:51pm",
-        "groups":  "Everyone"
+        "groups":  [
+                       "Everyone"
+                   ]
     },
     {
         "snapshot_date":  "2026-04-01",
@@ -1235,7 +1241,9 @@ export const demoEmployees: EmployeeCompletionRow[] = [
         "manager_email":  null,
         "employee_status":  "Active Offshore",
         "last_active":  "02-26-2026 05:46pm",
-        "groups":  "Everyone"
+        "groups":  [
+                       "Everyone"
+                   ]
     },
     {
         "snapshot_date":  "2026-04-01",
@@ -2613,7 +2621,9 @@ export const demoEmployees: EmployeeCompletionRow[] = [
         "manager_email":  null,
         "employee_status":  "Active Offshore",
         "last_active":  "03-30-2026 09:06pm",
-        "groups":  "Everyone"
+        "groups":  [
+                       "Everyone"
+                   ]
     },
     {
         "snapshot_date":  "2026-04-01",
@@ -2918,7 +2928,9 @@ export const demoEmployees: EmployeeCompletionRow[] = [
         "manager_email":  null,
         "employee_status":  "Active Offshore",
         "last_active":  "04-01-2026 03:58pm",
-        "groups":  "Everyone"
+        "groups":  [
+                       "Everyone"
+                   ]
     },
     {
         "snapshot_date":  "2026-04-01",
@@ -3030,7 +3042,9 @@ export const demoEmployees: EmployeeCompletionRow[] = [
         "manager_email":  null,
         "employee_status":  null,
         "last_active":  "12-31-2025 12:26am",
-        "groups":  "Everyone"
+        "groups":  [
+                       "Everyone"
+                   ]
     },
     {
         "snapshot_date":  "2026-04-01",
@@ -3063,7 +3077,9 @@ export const demoEmployees: EmployeeCompletionRow[] = [
         "manager_email":  null,
         "employee_status":  "Active Offshore",
         "last_active":  "03-24-2026 02:11pm",
-        "groups":  "Everyone"
+        "groups":  [
+                       "Everyone"
+                   ]
     },
     {
         "snapshot_date":  "2026-04-01",
@@ -3256,7 +3272,9 @@ export const demoEmployees: EmployeeCompletionRow[] = [
         "manager_email":  null,
         "employee_status":  "Active Offshore",
         "last_active":  "03-27-2026 04:46pm",
-        "groups":  "Everyone"
+        "groups":  [
+                       "Everyone"
+                   ]
     },
     {
         "snapshot_date":  "2026-04-01",
@@ -3708,7 +3726,9 @@ export const demoEmployees: EmployeeCompletionRow[] = [
         "manager_email":  null,
         "employee_status":  "Active Offshore",
         "last_active":  "03-19-2026 06:20pm",
-        "groups":  "Everyone"
+        "groups":  [
+                       "Everyone"
+                   ]
     },
     {
         "snapshot_date":  "2026-04-01",
