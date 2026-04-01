@@ -5,8 +5,6 @@
   --nao-green-soft: #8ac0a1;
   --nao-teal: #88d0c8;
   --nao-blue-soft: #82c3db;
-  --nao-lilac: #ab9dc6;
-  --nao-lilac-soft: #9a89bb;
   --nao-gold: #ffe599;
   --nao-red: #e08178;
   --nao-cream: #f5fbf4;
@@ -28,9 +26,7 @@ body {
   margin: 0;
   color: var(--nao-ink);
   font-family: var(--font-body), sans-serif;
-  background:
-    radial-gradient(circle at top center, rgba(130, 195, 219, 0.14), transparent 32%),
-    linear-gradient(180deg, rgba(245, 251, 244, 0.98) 0%, rgba(238, 246, 251, 0.98) 100%);
+  background: var(--nao-navy);
 }
 
 a {
@@ -330,7 +326,7 @@ a {
 }
 
 .stacked-segment--risk {
-  background: var(--nao-lilac-soft);
+  background: var(--nao-red);
 }
 
 .legend-row {
@@ -362,7 +358,7 @@ a {
 }
 
 .legend-dot--risk {
-  background: var(--nao-lilac-soft);
+  background: var(--nao-red);
 }
 
 .table-shell {
@@ -427,8 +423,8 @@ a {
 }
 
 .score-pill--risk {
-  background: rgba(171, 157, 198, 0.26);
-  color: #5f4e88;
+  background: rgba(224, 129, 120, 0.18);
+  color: #8f4139;
 }
 
 @media (max-width: 1320px) {
