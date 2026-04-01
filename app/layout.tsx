@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Manrope } from "next/font/google";
+import { Lexend, Playfair_Display } from "next/font/google";
 import "./globals.css";
 
-const bodyFont = Manrope({
+const bodyFont = Lexend({
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-body"
 });
 
-const displayFont = Cormorant_Garamond({
+const displayFont = Playfair_Display({
   subsets: ["latin"],
-  weight: ["500", "600", "700"],
+  weight: ["600", "700", "800"],
   variable: "--font-display"
 });
 

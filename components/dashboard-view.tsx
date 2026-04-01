@@ -159,7 +159,7 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
     };
   }, [filteredEmployees, filteredManagers.length]);
 
-  const managerMix = useMemo(() => buildManagerMix(filteredManagers).slice(0, 6), [filteredManagers]);
+  const managerMix = useMemo(() => buildManagerMix(filteredManagers), [filteredManagers]);
 
   return (
     <>
@@ -301,7 +301,8 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
             <p>Ranked highest to lowest</p>
           </div>
 
-          <div className="bar-list">
+          <div className="chart-scroll">
+            <div className="bar-list">
             {managerMix.map((manager) => (
               <div key={manager.name} className="bar-row">
                 <strong className="bar-row__label">{manager.name}</strong>
@@ -314,6 +315,7 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
                 <strong className="bar-row__value">{manager.averageCompletion}%</strong>
               </div>
             ))}
+            </div>
           </div>
         </article>
 
@@ -326,7 +328,8 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
             <p>Green = complete, gold = nearly complete, red = needs attention</p>
           </div>
 
-          <div className="bar-list">
+          <div className="chart-scroll">
+            <div className="bar-list">
             {managerMix.map((manager) => {
               const total = Math.max(manager.directReports, 1);
               return (
@@ -349,6 +352,7 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
                 </div>
               );
             })}
+            </div>
           </div>
 
           <div className="legend-row">
