@@ -7,8 +7,8 @@
   --nao-blue-soft: #82c3db;
   --nao-lilac: #ab9dc6;
   --nao-lilac-soft: #9a89bb;
-  --nao-gold: #ebc08a;
-  --nao-red: #d98b7f;
+  --nao-gold: #ffe599;
+  --nao-red: #e08178;
   --nao-cream: #f5fbf4;
   --nao-mist: #e6f2f7;
   --nao-border: #dae4fb;
@@ -52,6 +52,11 @@ a {
   border-radius: 28px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: var(--nao-shadow);
+}
+
+.chart-panel {
+  background:
+    linear-gradient(180deg, rgba(30, 53, 101, 0.05), rgba(255, 255, 255, 0.96));
 }
 
 .hero-layout {
@@ -256,7 +261,7 @@ a {
 }
 
 .chart-scroll {
-  max-height: 560px;
+  max-height: 294px;
   overflow-y: auto;
   padding-right: 10px;
 }
