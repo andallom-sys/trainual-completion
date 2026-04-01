@@ -539,7 +539,6 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
             <p className="eyebrow">Employee Drilldown</p>
             <h2>Completion by Employee</h2>
           </div>
-          <p>Sorted lowest completion first for follow-up actions</p>
         </div>
         <EmployeeTable employees={filteredEmployees} />
       </section>
