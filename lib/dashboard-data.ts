@@ -1,4 +1,3 @@
-import { createClient } from "@supabase/supabase-js";
 import { demoEmployees } from "@/lib/demo-snapshot";
 import type {
   DashboardSnapshot,
@@ -72,61 +71,7 @@ export function buildDashboardSnapshot(
   };
 }
 
-async function fetchSupabaseSnapshot(): Promise<DashboardSnapshot | null> {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    return null;
-  }
-
-  try {
-    const parsed = new URL(url);
-    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
-      return null;
-    }
-  } catch {
-    return null;
-  }
-
-  const supabase = createClient(url, key);
-  const latestResult = await supabase
-    .from("employee_completion_snapshots")
-    .select("snapshot_date")
-    .order("snapshot_date", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (latestResult.error || !latestResult.data?.snapshot_date) {
-    return null;
-  }
-
-  const snapshotDate = latestResult.data.snapshot_date;
-  const rowsResult = await supabase
-    .from("employee_completion_snapshots")
-    .select("*")
-    .eq("snapshot_date", snapshotDate)
-    .order("completion_score", { ascending: true });
-
-  if (rowsResult.error || !rowsResult.data) {
-    return null;
-  }
-
-  const employees = rowsResult.data.map((row) => ({
-    ...row,
-    groups: Array.isArray(row.groups) ? row.groups : []
-  })) as EmployeeCompletionRow[];
-
-  return buildDashboardSnapshot(employees, snapshotDate);
-}
-
 export async function getDashboardSnapshot(): Promise<DashboardSnapshot> {
-  const remote = await fetchSupabaseSnapshot();
-
-  if (remote) {
-    return remote;
-  }
-
   return buildDashboardSnapshot(demoEmployees, "2026-04-01");
 }
 
