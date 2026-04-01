@@ -132,13 +132,32 @@ a {
 }
 
 .scorecard-box {
+  position: relative;
   padding: 26px 24px;
 }
 
 .scorecard-box p {
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(154, 207, 140, 0.2);
   color: rgba(30, 53, 101, 0.76);
   font-size: 0.86rem;
+}
+
+.scorecard-box::before,
+.metric-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 24px;
+  width: 92px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--nao-green);
 }
 
 .scorecard-box strong {
@@ -156,11 +175,18 @@ a {
 }
 
 .metric-card {
+  position: relative;
   padding: 26px;
 }
 
 .metric-label {
   margin: 0;
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: rgba(154, 207, 140, 0.18);
   color: rgba(30, 53, 101, 0.78);
   font-size: 0.82rem;
 }
@@ -181,6 +207,11 @@ a {
 .filter-panel {
   padding: 26px;
   margin-bottom: 22px;
+}
+
+.filter-panel--upload {
+  margin-top: 22px;
+  margin-bottom: 0;
 }
 
 .upload-toolbar {
@@ -258,6 +289,10 @@ a {
   gap: 18px;
 }
 
+.filter-grid--secondary {
+  margin-top: 18px;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -285,6 +320,11 @@ a {
 
 .field--search {
   margin-top: 18px;
+}
+
+.field--searchwide {
+  grid-column: span 3;
+  margin-top: 0;
 }
 
 .charts-grid {

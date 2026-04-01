@@ -59,6 +59,9 @@ export function buildDashboardSnapshot(
 
   return {
     asOf,
+    uploaded_at: null,
+    source_filename: null,
+    storage_key: null,
     employees: sortedEmployees,
     managers,
     totals: {

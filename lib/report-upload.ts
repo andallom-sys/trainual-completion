@@ -3,6 +3,7 @@ import { demoEmployees } from "@/lib/demo-snapshot";
 import type { DashboardSnapshot, EmployeeCompletionRow } from "@/lib/types";
 
 const SHARED_SNAPSHOT_KEY = "shared/latest-dashboard-snapshot.json";
+const HISTORY_INDEX_KEY = "shared/history-index.json";
 
 function normalize(value: string | null | undefined) {
   return (value ?? "").trim().toLowerCase();
@@ -127,9 +128,21 @@ export function mergeCompletionReport(csvText: string, filename: string): Dashbo
     };
   }
 
-  return buildDashboardSnapshot(merged, `${filename} uploaded ${new Date().toLocaleDateString()}`);
+  const uploadedAt = new Date();
+  const snapshot = buildDashboardSnapshot(merged, uploadedAt.toLocaleString());
+
+  return {
+    ...snapshot,
+    asOf: uploadedAt.toLocaleString(),
+    uploaded_at: uploadedAt.toISOString(),
+    source_filename: filename
+  };
 }
 
 export function getSharedSnapshotKey() {
   return SHARED_SNAPSHOT_KEY;
+}
+
+export function getHistoryIndexKey() {
+  return HISTORY_INDEX_KEY;
 }

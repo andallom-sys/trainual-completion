@@ -26,6 +26,9 @@ export type ManagerSummary = {
 
 export type DashboardSnapshot = {
   asOf: string;
+  uploaded_at?: string | null;
+  source_filename?: string | null;
+  storage_key?: string | null;
   employees: EmployeeCompletionRow[];
   managers: ManagerSummary[];
   totals: {

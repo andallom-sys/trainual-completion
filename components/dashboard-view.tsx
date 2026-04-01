@@ -15,6 +15,13 @@ type ManagerMix = ManagerSummary & {
   needsAttentionCount: number;
 };
 
+type HistoryOption = {
+  key: string;
+  uploaded_at: string;
+  label: string;
+  source_filename?: string | null;
+};
+
 function sortAlpha(values: string[]) {
   return [...values].sort((a, b) => a.localeCompare(b));
 }
@@ -34,8 +41,23 @@ function buildManagerMix(managers: ManagerSummary[]): ManagerMix[] {
     .sort((a, b) => b.averageCompletion - a.averageCompletion);
 }
 
+function formatLastUpdate(snapshot: DashboardSnapshot) {
+  if (snapshot.uploaded_at) {
+    return new Date(snapshot.uploaded_at).toLocaleString();
+  }
+
+  return snapshot.asOf;
+}
+
+function buildHistoryLabel(option: HistoryOption) {
+  const uploadedAt = new Date(option.uploaded_at).toLocaleString();
+  return option.source_filename ? `${uploadedAt} - ${option.source_filename}` : option.label;
+}
+
 export function DashboardView({ snapshot }: DashboardViewProps) {
   const [activeSnapshot, setActiveSnapshot] = useState(snapshot);
+  const [historyOptions, setHistoryOptions] = useState<HistoryOption[]>([]);
+  const [historySelection, setHistorySelection] = useState("latest");
   const [uploadPassword, setUploadPassword] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadMessage, setUploadMessage] = useState(
@@ -53,29 +75,68 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
   useEffect(() => {
     let isMounted = true;
 
-    async function loadSharedSnapshot() {
+    async function loadSharedState() {
       try {
-        const response = await fetch("/api/shared-snapshot", { cache: "no-store" });
-        if (!response.ok) {
-          return;
+        const [snapshotResponse, historyResponse] = await Promise.all([
+          fetch("/api/shared-snapshot", { cache: "no-store" }),
+          fetch("/api/upload-history", { cache: "no-store" })
+        ]);
+
+        if (snapshotResponse.ok) {
+          const sharedSnapshot = (await snapshotResponse.json()) as DashboardSnapshot;
+          if (isMounted && Array.isArray(sharedSnapshot.employees)) {
+            setActiveSnapshot(sharedSnapshot);
+          }
         }
 
-        const sharedSnapshot = (await response.json()) as DashboardSnapshot;
-        if (isMounted && Array.isArray(sharedSnapshot.employees)) {
-          setActiveSnapshot(sharedSnapshot);
-          setUploadMessage(`Live snapshot loaded: ${sharedSnapshot.asOf}`);
+        if (historyResponse.ok) {
+          const historyPayload = (await historyResponse.json()) as HistoryOption[];
+          if (isMounted && Array.isArray(historyPayload)) {
+            setHistoryOptions(historyPayload);
+          }
         }
       } catch {
         // Keep the embedded snapshot if shared fetch fails.
       }
     }
 
-    void loadSharedSnapshot();
+    void loadSharedState();
 
     return () => {
       isMounted = false;
     };
   }, []);
+
+  async function loadSnapshotByKey(key: string) {
+    const response = await fetch(
+      key === "latest" ? "/api/shared-snapshot" : `/api/shared-snapshot?key=${encodeURIComponent(key)}`,
+      { cache: "no-store" }
+    );
+
+    if (!response.ok) {
+      throw new Error("Could not load that saved dashboard version.");
+    }
+
+    const snapshotPayload = (await response.json()) as DashboardSnapshot;
+    setActiveSnapshot(snapshotPayload);
+  }
+
+  async function handleHistoryChange(nextValue: string) {
+    setHistorySelection(nextValue);
+
+    try {
+      await loadSnapshotByKey(nextValue);
+      setUploadMessage(
+        nextValue === "latest"
+          ? "Showing the latest shared dashboard snapshot."
+          : "Showing the selected saved dashboard version."
+      );
+      setIsUploadError(false);
+    } catch (error) {
+      setUploadMessage(error instanceof Error ? error.message : "Could not load that saved version.");
+      setIsUploadError(true);
+    }
+  }
 
   async function handleUploadSubmit() {
     if (!selectedFile) {
@@ -108,7 +169,16 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
         throw new Error("error" in payload ? payload.error : "Upload failed.");
       }
 
+      const historyResponse = await fetch("/api/upload-history", { cache: "no-store" });
+      if (historyResponse.ok) {
+        const historyPayload = (await historyResponse.json()) as HistoryOption[];
+        if (Array.isArray(historyPayload)) {
+          setHistoryOptions(historyPayload);
+        }
+      }
+
       setActiveSnapshot(payload);
+      setHistorySelection("latest");
       setUploadMessage(`Shared dashboard updated from ${selectedFile.name}.`);
       setIsUploadError(false);
       setSelectedFile(null);
@@ -256,7 +326,10 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
             healthiest team completion rates, and which employees need follow-up right now.
           </p>
           <div className="hero-meta">
-            <span>Snapshot date: {activeSnapshot.asOf}</span>
+            <span>
+              Last update: {formatLastUpdate(activeSnapshot)}
+              {activeSnapshot.source_filename ? ` from ${activeSnapshot.source_filename}` : ""}
+            </span>
             <span>Source: Trainual + employee roster mapping</span>
           </div>
         </article>
@@ -305,36 +378,6 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
       </section>
 
       <section className="filter-panel">
-        <div className="upload-toolbar">
-          <div className="upload-copy">
-            <strong>Refresh the live dashboard for everyone</strong>
-            <p className={isUploadError ? "upload-message upload-message--error" : "upload-message"}>
-              {uploadMessage}
-            </p>
-          </div>
-
-          <div className="upload-actions upload-actions--stacked">
-            <label className="field upload-field">
-              <span>Upload Password</span>
-              <input
-                type="password"
-                value={uploadPassword}
-                onChange={(event) => setUploadPassword(event.target.value)}
-                placeholder="Enter admin upload password"
-              />
-            </label>
-
-            <label className="upload-button">
-              <input type="file" accept=".csv,text/csv" onChange={handleFileSelection} />
-              <span>{selectedFile ? selectedFile.name : "Choose Completion CSV"}</span>
-            </label>
-
-            <button type="button" className="reset-upload-button" onClick={handleUploadSubmit} disabled={isUploading}>
-              {isUploading ? "Uploading..." : "Upload and Refresh Live Site"}
-            </button>
-          </div>
-        </div>
-
         <div className="filter-grid">
           <label className="field">
             <span>Manager</span>
@@ -395,14 +438,28 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
           </label>
         </div>
 
-        <label className="field field--search">
-          <span>Search Employee</span>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Name, email, or title"
-          />
-        </label>
+        <div className="filter-grid filter-grid--secondary">
+          <label className="field">
+            <span>Data History</span>
+            <select value={historySelection} onChange={(event) => void handleHistoryChange(event.target.value)}>
+              <option value="latest">Latest Upload</option>
+              {historyOptions.map((option) => (
+                <option key={option.key} value={option.key}>
+                  {buildHistoryLabel(option)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field field--search field--searchwide">
+            <span>Search Employee</span>
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Name, email, or title"
+            />
+          </label>
+        </div>
       </section>
 
       <section className="charts-grid">
@@ -439,7 +496,6 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
               <p className="eyebrow">Team Mix</p>
               <h2>Status Distribution by Manager</h2>
             </div>
-            <p>Green = complete, gold = nearly complete, red = needs attention</p>
           </div>
 
           <div className="chart-scroll">
@@ -486,6 +542,38 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
           <p>Sorted lowest completion first for follow-up actions</p>
         </div>
         <EmployeeTable employees={filteredEmployees} />
+      </section>
+
+      <section className="filter-panel filter-panel--upload">
+        <div className="upload-toolbar">
+          <div className="upload-copy">
+            <strong>Refresh the live dashboard for everyone</strong>
+            <p className={isUploadError ? "upload-message upload-message--error" : "upload-message"}>
+              {uploadMessage}
+            </p>
+          </div>
+
+          <div className="upload-actions upload-actions--stacked">
+            <label className="field upload-field">
+              <span>Upload Password</span>
+              <input
+                type="password"
+                value={uploadPassword}
+                onChange={(event) => setUploadPassword(event.target.value)}
+                placeholder="Enter admin upload password"
+              />
+            </label>
+
+            <label className="upload-button">
+              <input type="file" accept=".csv,text/csv" onChange={handleFileSelection} />
+              <span>{selectedFile ? selectedFile.name : "Choose Completion CSV"}</span>
+            </label>
+
+            <button type="button" className="reset-upload-button" onClick={handleUploadSubmit} disabled={isUploading}>
+              {isUploading ? "Uploading..." : "Upload and Refresh Live Site"}
+            </button>
+          </div>
+        </div>
       </section>
     </>
   );
