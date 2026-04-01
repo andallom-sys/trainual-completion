@@ -214,6 +214,10 @@ a {
   flex-wrap: wrap;
 }
 
+.upload-actions--stacked {
+  align-items: end;
+}
+
 .upload-button,
 .reset-upload-button {
   display: inline-flex;
@@ -238,6 +242,14 @@ a {
 
 .upload-button input {
   display: none;
+}
+
+.upload-field {
+  min-width: 260px;
+}
+
+.upload-field input {
+  min-height: 52px;
 }
 
 .filter-grid {

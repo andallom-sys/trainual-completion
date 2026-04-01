@@ -35,10 +35,29 @@ Executive dashboard for Trainual completion performance across NAO Medical emplo
 This project is also configured for Cloudflare Workers using OpenNext.
 
 1. Run `npm install`.
-2. Keep `.dev.vars` minimal for local Worker preview.
-3. Log in to Cloudflare with `npx wrangler login`.
-4. Preview locally with `npm run preview`.
-5. Deploy to Workers with `npm run deploy:cf`.
+2. Create two R2 buckets in Cloudflare:
+   - `nao-trainual-dashboard`
+   - `nao-trainual-dashboard-preview`
+3. Set `UPLOAD_ADMIN_PASSWORD` in `.dev.vars` for local preview.
+4. Add the same `UPLOAD_ADMIN_PASSWORD` in your Cloudflare Worker settings.
+5. Log in to Cloudflare with `npx wrangler login`.
+6. Preview locally with `npm run preview`.
+7. Deploy to Workers with `npm run deploy:cf`.
+
+## Shared live updates
+
+The live dashboard can now accept a new Trainual CSV and refresh the shared site for everyone.
+
+- `GET /api/shared-snapshot` reads the latest shared snapshot from R2
+- `POST /api/upload-report` processes the uploaded Trainual CSV and writes the newest shared snapshot to R2
+- uploads require the `UPLOAD_ADMIN_PASSWORD` value
+
+### Local preview variables
+
+```env
+NEXTJS_ENV=development
+UPLOAD_ADMIN_PASSWORD=your_admin_password
+```
 
 Cloudflare's official docs say Next.js runs on Workers via the OpenNext adapter, and Workers Free currently includes `100,000` requests per day with `10 ms` CPU time per invocation. Static asset requests are free and unlimited when they do not invoke Functions.
 

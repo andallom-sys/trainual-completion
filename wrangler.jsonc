@@ -11,6 +11,13 @@
     "directory": ".open-next/assets",
     "binding": "ASSETS"
   },
+  "r2_buckets": [
+    {
+      "binding": "TRAINUAL_DASHBOARD_BUCKET",
+      "bucket_name": "nao-trainual-dashboard",
+      "preview_bucket_name": "nao-trainual-dashboard-preview"
+    }
+  ],
   "observability": {
     "enabled": true
   },

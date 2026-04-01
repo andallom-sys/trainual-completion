@@ -2,16 +2,11 @@
 
 import { ChangeEvent, startTransition, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { EmployeeTable } from "@/components/employee-table";
-import { buildDashboardSnapshot, getCompletionBand } from "@/lib/dashboard-data";
+import { getCompletionBand } from "@/lib/dashboard-data";
 import type { DashboardSnapshot, EmployeeCompletionRow, ManagerSummary } from "@/lib/types";
 
 type DashboardViewProps = {
   snapshot: DashboardSnapshot;
-};
-
-type UploadedSnapshot = {
-  asOf: string;
-  employees: EmployeeCompletionRow[];
 };
 
 type ManagerMix = ManagerSummary & {
@@ -28,155 +23,26 @@ function getTitle(employee: EmployeeCompletionRow) {
   return employee.job_title ?? "Unknown";
 }
 
-function normalize(value: string | null | undefined) {
-  return (value ?? "").trim().toLowerCase();
-}
-
-function parseCsv(text: string) {
-  const rows: string[][] = [];
-  let field = "";
-  let row: string[] = [];
-  let inQuotes = false;
-
-  for (let index = 0; index < text.length; index += 1) {
-    const character = text[index];
-    const next = text[index + 1];
-
-    if (character === '"') {
-      if (inQuotes && next === '"') {
-        field += '"';
-        index += 1;
-      } else {
-        inQuotes = !inQuotes;
-      }
-      continue;
-    }
-
-    if (character === "," && !inQuotes) {
-      row.push(field);
-      field = "";
-      continue;
-    }
-
-    if ((character === "\n" || character === "\r") && !inQuotes) {
-      if (character === "\r" && next === "\n") {
-        index += 1;
-      }
-
-      row.push(field);
-      field = "";
-
-      if (row.some((cell) => cell.length > 0)) {
-        rows.push(row);
-      }
-
-      row = [];
-      continue;
-    }
-
-    field += character;
-  }
-
-  row.push(field);
-  if (row.some((cell) => cell.length > 0)) {
-    rows.push(row);
-  }
-
-  return rows;
-}
-
 function buildManagerMix(managers: ManagerSummary[]): ManagerMix[] {
   return managers
     .map((manager) => ({
       ...manager,
-      completeCount: manager.team.filter(
-        (member) => getCompletionBand(member.completion_score) === "Complete"
-      ).length,
-      nearlyCompleteCount: manager.team.filter(
-        (member) => getCompletionBand(member.completion_score) === "Nearly Complete"
-      ).length,
-      needsAttentionCount: manager.team.filter(
-        (member) => getCompletionBand(member.completion_score) === "Needs Attention"
-      ).length
+      completeCount: manager.team.filter((member) => getCompletionBand(member.completion_score) === "Complete").length,
+      nearlyCompleteCount: manager.team.filter((member) => getCompletionBand(member.completion_score) === "Nearly Complete").length,
+      needsAttentionCount: manager.team.filter((member) => getCompletionBand(member.completion_score) === "Needs Attention").length
     }))
     .sort((a, b) => b.averageCompletion - a.averageCompletion);
 }
 
-function mergeCompletionReport(baseEmployees: EmployeeCompletionRow[], csvText: string, filename: string) {
-  const rows = parseCsv(csvText);
-  const [headers, ...dataRows] = rows;
-
-  if (!headers?.length) {
-    throw new Error("The uploaded file is empty.");
-  }
-
-  const headerIndex = new Map(headers.map((header, index) => [header.trim(), index]));
-  for (const requiredHeader of ["Name", "Email", "Completion score"]) {
-    if (!headerIndex.has(requiredHeader)) {
-      throw new Error(`The file must include the "${requiredHeader}" column.`);
-    }
-  }
-
-  const byEmail = new Map(baseEmployees.map((employee) => [normalize(employee.employee_email), employee]));
-  const byName = new Map(baseEmployees.map((employee) => [normalize(employee.employee_name), employee]));
-  const merged = baseEmployees.map((employee) => ({ ...employee, groups: [...employee.groups] }));
-
-  for (const dataRow of dataRows) {
-    const email = normalize(dataRow[headerIndex.get("Email") ?? -1]);
-    const name = dataRow[headerIndex.get("Name") ?? -1]?.trim() ?? "";
-    const completionRaw = dataRow[headerIndex.get("Completion score") ?? -1]?.trim() ?? "";
-    const match =
-      (email && byEmail.get(email)) ||
-      (name && byName.get(normalize(name))) ||
-      null;
-
-    if (!match) {
-      continue;
-    }
-
-    const mergedIndex = merged.findIndex((employee) => employee.employee_email === match.employee_email);
-    if (mergedIndex === -1) {
-      continue;
-    }
-
-    const numericCompletion = Number.parseFloat(completionRaw.replace("%", ""));
-    const groupsRaw = dataRow[headerIndex.get("Groups") ?? -1] ?? "";
-    const reportManager = dataRow[headerIndex.get("Reports to") ?? -1]?.trim() ?? "";
-    const lastActive = dataRow[headerIndex.get("Last active") ?? -1]?.trim() ?? "";
-    const jobTitle = dataRow[headerIndex.get("Job title") ?? -1]?.trim() ?? "";
-
-    merged[mergedIndex] = {
-      ...merged[mergedIndex],
-      employee_name: name || merged[mergedIndex].employee_name,
-      employee_email: email || merged[mergedIndex].employee_email,
-      job_title: jobTitle || merged[mergedIndex].job_title,
-      completion_score: Number.isNaN(numericCompletion)
-        ? merged[mergedIndex].completion_score
-        : numericCompletion,
-      trainual_manager_name: reportManager || merged[mergedIndex].trainual_manager_name,
-      manager_name:
-        merged[mergedIndex].roster_manager_name ||
-        reportManager ||
-        merged[mergedIndex].manager_name,
-      last_active: lastActive || merged[mergedIndex].last_active,
-      groups: groupsRaw
-        ? groupsRaw.split(",").map((item) => item.trim()).filter(Boolean)
-        : merged[mergedIndex].groups
-    };
-  }
-
-  return {
-    asOf: `${filename} uploaded ${new Date().toLocaleDateString()}`,
-    employees: merged
-  };
-}
-
 export function DashboardView({ snapshot }: DashboardViewProps) {
   const [activeSnapshot, setActiveSnapshot] = useState(snapshot);
+  const [uploadPassword, setUploadPassword] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadMessage, setUploadMessage] = useState(
-    "Upload a fresh Trainual completion CSV to refresh this dashboard."
+    "Upload a fresh Trainual completion CSV to refresh this dashboard for everyone."
   );
   const [isUploadError, setIsUploadError] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [query, setQuery] = useState("");
   const [managerFilter, setManagerFilter] = useState("All Managers");
   const [titleFilter, setTitleFilter] = useState("All Titles");
@@ -185,52 +51,79 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
   const deferredQuery = useDeferredValue(query);
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("nao-trainual-uploaded-snapshot");
+    let isMounted = true;
 
-    if (!saved) {
-      return;
-    }
+    async function loadSharedSnapshot() {
+      try {
+        const response = await fetch("/api/shared-snapshot", { cache: "no-store" });
+        if (!response.ok) {
+          return;
+        }
 
-    try {
-      const parsed = JSON.parse(saved) as UploadedSnapshot;
-      if (Array.isArray(parsed.employees) && typeof parsed.asOf === "string") {
-        setActiveSnapshot(buildDashboardSnapshot(parsed.employees, parsed.asOf));
-        setUploadMessage(`Using uploaded report: ${parsed.asOf}`);
+        const sharedSnapshot = (await response.json()) as DashboardSnapshot;
+        if (isMounted && Array.isArray(sharedSnapshot.employees)) {
+          setActiveSnapshot(sharedSnapshot);
+          setUploadMessage(`Live snapshot loaded: ${sharedSnapshot.asOf}`);
+        }
+      } catch {
+        // Keep the embedded snapshot if shared fetch fails.
       }
-    } catch {
-      window.localStorage.removeItem("nao-trainual-uploaded-snapshot");
     }
+
+    void loadSharedSnapshot();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-
-    if (!file) {
+  async function handleUploadSubmit() {
+    if (!selectedFile) {
+      setUploadMessage("Choose a Trainual completion CSV first.");
+      setIsUploadError(true);
       return;
     }
 
-    try {
-      const text = await file.text();
-      const uploaded = mergeCompletionReport(snapshot.employees, text, file.name);
-      window.localStorage.setItem("nao-trainual-uploaded-snapshot", JSON.stringify(uploaded));
-      setActiveSnapshot(buildDashboardSnapshot(uploaded.employees, uploaded.asOf));
-      setUploadMessage(`Updated from ${file.name}. This browser will keep using it until you reset.`);
-      setIsUploadError(false);
-    } catch (error) {
-      setUploadMessage(
-        error instanceof Error ? error.message : "Could not read that CSV file."
-      );
+    if (!uploadPassword.trim()) {
+      setUploadMessage("Enter the upload password before sending the report.");
       setIsUploadError(true);
+      return;
     }
 
-    event.target.value = "";
+    const formData = new FormData();
+    formData.append("file", selectedFile);
+    formData.append("password", uploadPassword);
+
+    setIsUploading(true);
+
+    try {
+      const response = await fetch("/api/upload-report", {
+        method: "POST",
+        body: formData
+      });
+
+      const payload = (await response.json()) as DashboardSnapshot | { error: string };
+
+      if (!response.ok || "error" in payload) {
+        throw new Error("error" in payload ? payload.error : "Upload failed.");
+      }
+
+      setActiveSnapshot(payload);
+      setUploadMessage(`Shared dashboard updated from ${selectedFile.name}.`);
+      setIsUploadError(false);
+      setSelectedFile(null);
+    } catch (error) {
+      setUploadMessage(
+        error instanceof Error ? error.message : "Could not process that CSV file."
+      );
+      setIsUploadError(true);
+    } finally {
+      setIsUploading(false);
+    }
   }
 
-  function handleResetUpload() {
-    window.localStorage.removeItem("nao-trainual-uploaded-snapshot");
-    setActiveSnapshot(snapshot);
-    setUploadMessage("Reset to the embedded dashboard snapshot.");
-    setIsUploadError(false);
+  function handleFileSelection(event: ChangeEvent<HTMLInputElement>) {
+    setSelectedFile(event.target.files?.[0] ?? null);
   }
 
   const managerOptions = useMemo(
@@ -241,9 +134,7 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
   const titleOptions = useMemo(
     () =>
       sortAlpha(
-        Array.from(
-          new Set(activeSnapshot.employees.map((employee) => getTitle(employee)).filter(Boolean))
-        )
+        Array.from(new Set(activeSnapshot.employees.map((employee) => getTitle(employee)).filter(Boolean)))
       ),
     [activeSnapshot.employees]
   );
@@ -314,12 +205,8 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
           email: team.find((member) => member.manager_email)?.manager_email ?? null,
           directReports,
           averageCompletion,
-          atRiskCount: team.filter(
-            (member) => getCompletionBand(member.completion_score) === "Needs Attention"
-          ).length,
-          completedCount: team.filter(
-            (member) => getCompletionBand(member.completion_score) === "Complete"
-          ).length,
+          atRiskCount: team.filter((member) => getCompletionBand(member.completion_score) === "Needs Attention").length,
+          completedCount: team.filter((member) => getCompletionBand(member.completion_score) === "Complete").length,
           team: [...team].sort((a, b) => a.completion_score - b.completion_score)
         };
       })
@@ -420,19 +307,30 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
       <section className="filter-panel">
         <div className="upload-toolbar">
           <div className="upload-copy">
-            <strong>Refresh from Trainual CSV</strong>
+            <strong>Refresh the live dashboard for everyone</strong>
             <p className={isUploadError ? "upload-message upload-message--error" : "upload-message"}>
               {uploadMessage}
             </p>
           </div>
 
-          <div className="upload-actions">
-            <label className="upload-button">
-              <input type="file" accept=".csv,text/csv" onChange={handleUpload} />
-              <span>Upload Completion Report</span>
+          <div className="upload-actions upload-actions--stacked">
+            <label className="field upload-field">
+              <span>Upload Password</span>
+              <input
+                type="password"
+                value={uploadPassword}
+                onChange={(event) => setUploadPassword(event.target.value)}
+                placeholder="Enter admin upload password"
+              />
             </label>
-            <button type="button" className="reset-upload-button" onClick={handleResetUpload}>
-              Reset to Embedded Snapshot
+
+            <label className="upload-button">
+              <input type="file" accept=".csv,text/csv" onChange={handleFileSelection} />
+              <span>{selectedFile ? selectedFile.name : "Choose Completion CSV"}</span>
+            </label>
+
+            <button type="button" className="reset-upload-button" onClick={handleUploadSubmit} disabled={isUploading}>
+              {isUploading ? "Uploading..." : "Upload and Refresh Live Site"}
             </button>
           </div>
         </div>
@@ -572,18 +470,9 @@ export function DashboardView({ snapshot }: DashboardViewProps) {
           </div>
 
           <div className="legend-row">
-            <span>
-              <i className="legend-dot legend-dot--complete" />
-              Complete
-            </span>
-            <span>
-              <i className="legend-dot legend-dot--watch" />
-              Nearly Complete
-            </span>
-            <span>
-              <i className="legend-dot legend-dot--risk" />
-              Needs Attention
-            </span>
+            <span><i className="legend-dot legend-dot--complete" />Complete</span>
+            <span><i className="legend-dot legend-dot--watch" />Nearly Complete</span>
+            <span><i className="legend-dot legend-dot--risk" />Needs Attention</span>
           </div>
         </article>
       </section>
