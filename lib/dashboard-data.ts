@@ -80,6 +80,15 @@ async function fetchSupabaseSnapshot(): Promise<DashboardSnapshot | null> {
     return null;
   }
 
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+      return null;
+    }
+  } catch {
+    return null;
+  }
+
   const supabase = createClient(url, key);
   const latestResult = await supabase
     .from("employee_completion_snapshots")
@@ -133,16 +142,26 @@ export function getManagerHeat(manager: ManagerSummary) {
   return "urgent";
 }
 
-export function getScoreTone(score: number) {
+export function getCompletionBand(score: number) {
   if (score >= 100) {
-    return "complete";
-  }
-
-  if (score >= 85) {
-    return "strong";
+    return "Complete";
   }
 
   if (score >= 70) {
+    return "Nearly Complete";
+  }
+
+  return "Needs Attention";
+}
+
+export function getScoreTone(score: number) {
+  const band = getCompletionBand(score);
+
+  if (band === "Complete") {
+    return "complete";
+  }
+
+  if (band === "Nearly Complete") {
     return "watch";
   }
 
