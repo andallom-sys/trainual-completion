@@ -386,6 +386,27 @@ a {
   font-size: 0.82rem;
 }
 
+.sort-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+}
+
+.sort-indicator {
+  font-size: 0.92rem;
+  line-height: 1;
+  color: rgba(30, 53, 101, 0.65);
+}
+
 .employee-table td {
   padding: 18px 14px;
   border-bottom: 1px solid rgba(207, 220, 204, 0.8);
